@@ -5,7 +5,7 @@ import numpy as np
 import math
 import pathcleaner
 from collections import defaultdict
-from processes.default import DefaultProcess
+from processes.default import DefaultProcess, PenSetup, Multilayer
 import sys
 
 
@@ -86,7 +86,9 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("dxftogcode.py <input file> <output file prefix>")
         exit()
-        
+
+
+    process = Multilayer
 
     raw, errors = load_dxf(sys.argv[1])
 
@@ -98,8 +100,8 @@ if __name__ == "__main__":
         print("All entities succesfully loaded")
 
 
-    for unit, layers in DefaultProcess.layers_to_units(raw.keys()).items():
-        parameters = DefaultProcess.geometry_parameters(unit)
+    for unit, layers in process.layers_to_units(raw.keys()).items():
+        parameters = process.geometry_parameters(unit)
         tol = parameters['tolerance']
         geometry = []
         for layer in layers:
@@ -110,5 +112,5 @@ if __name__ == "__main__":
         optimized = pathcleaner.clean_paths(geometry, **parameters)
 
         with open(sys.argv[2] + '-' + unit + '.gcode','w') as f:
-            for x in DefaultProcess.generate_code(unit,optimized):
+            for x in process.generate_code(unit,optimized):
                 f.write(x + '\n')

@@ -2,6 +2,10 @@
 # * single tool pen plotting (active, passive)
 # * multi-pen single tool plotting
 # * repeated, fiducial-driven workflows
+#  (both of the previous require input of some calibration data immediately
+#  before generating gcode. hmmm)
+# * easily assigning different proccesses to different layers (or different parameters?)
+# * velocity/pressure painting (via z coords?)
 
 def axes_dict(d):
     return ' '.join((v + str(x) for v,x in d.items()))
@@ -79,3 +83,47 @@ class DefaultProcess:
         height = cls.heights(unit_name)['travel']['V']
         yield f"G0 V{height} F4000"
 
+import numpy as np
+
+class PenSetup(DefaultProcess):
+
+    @classmethod
+    def prelude(cls, unit_name, starting_position):
+        heights = cls.heights(unit_name)
+        
+        yield from super().prelude(unit_name, starting_position)
+        yield f"G1 V{heights['plot']['V'] - 0.5} F4000"
+        yield 'M291 P"Touch pen to material surface and lock" T-1'
+        yield 'M226'
+        
+    @classmethod
+    def generate_code(cls, unit_name, segments):
+        offset = np.array([100,100])
+        yield from super().generate_code(unit_name, (offset + s for s in segments))
+
+
+    @classmethod
+    def speeds(cls,unit_name):
+        parent = super().speeds(unit_name)
+        parent['plot'] = 10000
+        return parent
+    
+    @classmethod
+    def heights(cls,unit_name):
+        parent = super().heights(unit_name)
+        parent['plot']['V'] = 6
+        return parent
+
+class Multilayer(PenSetup):
+
+    @classmethod
+    def layers_to_units(_,layers):
+
+        files = {'reference' : ['Default']}
+
+        for i, l in enumerate(layers):
+            if l != 'Default':
+                files[''.join(l.split())] =[l]
+
+
+        return files
