@@ -9,6 +9,7 @@ import numpy as np
 
 def clean_paths(paths, link = True, reverse = True, deduplicate = True, merge = True, reduce = None):
 
+    
     if deduplicate:
         paths = list(remove_duplicates(paths))
 
@@ -42,6 +43,12 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
 
     
     n = len(paths)
+
+    if n < 2:
+        for p in paths:
+            yield p
+        return
+
     live = np.ones(2 * n, dtype = int) # Twice as large, so we can use it as mask
 
     # If we want to preserve direction, just make sure we'll never see endpoints in our queries
@@ -95,9 +102,13 @@ def merge_paths(paths, staydown):
     """ Takes a generator of ordered paths and joins segments connected only
     by short rapids """
     staydown = staydown**2
-    prev = [next(paths)]
+
+    prev = None
 
     for p in paths:
+        if prev is None:
+            prev = [p]
+            continue
         # We know this is shorter than to the end point, if
         # the linking algorithm was used
         delta = prev[-1][-1] - p[0]
@@ -107,7 +118,8 @@ def merge_paths(paths, staydown):
             yield np.concatenate(prev)
             prev = [p]
             
-    yield np.concatenate(prev)
+    if prev is not None:    
+        yield np.concatenate(prev)
     
 def polyline_length(line):
     acc = 0
@@ -174,6 +186,10 @@ def tree_search_endpoints(paths, group, epsilon):
 
 def remove_duplicates(paths, epsilon = 1e-6):
     n = len(paths)
+
+    if n < 2:
+        return paths
+    
     keep = np.ones(n, dtype = int)
     lengths = np.empty(n)
     for i in range(n):
