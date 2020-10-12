@@ -5,7 +5,7 @@ import numpy as np
 import math
 import pathcleaner
 from collections import defaultdict
-from processes.default import DefaultProcess, PenSetup, Multilayer
+from processes import Multipen
 import sys
 
 
@@ -80,6 +80,23 @@ def load_dxf(fp):
     return dict(objects), errors
 
 
+def obtain_parameters(parameters, unit):
+
+    name, runtime, scope = unit['name'],  unit['runtime'], {}
+    if name in parameters:
+        scope = parameters[name]
+    else:
+        parameters[name] = scope
+
+    new = False
+    for p in unit['runtime']:
+        if p not in scope:
+            scope[p] = input(f"Parameter {p} for unit {name}: ").strip()
+            new = True
+
+    return parameters, new
+        
+
 if __name__ == "__main__":
 
 
@@ -88,7 +105,6 @@ if __name__ == "__main__":
         exit()
 
 
-    process = Multilayer
 
     raw, errors = load_dxf(sys.argv[1])
 
@@ -99,18 +115,40 @@ if __name__ == "__main__":
     else:
         print("All entities succesfully loaded")
 
+        
+    process = Multipen()
+    parameters = {}
 
-    for unit, layers in process.layers_to_units(raw.keys()).items():
-        parameters = process.geometry_parameters(unit)
-        tol = parameters['tolerance']
-        geometry = []
-        for layer in layers:
-            for entity in raw[layer]:
-                geometry.append(entity.render_to_tolerance(tol))
-            
-        del parameters['tolerance']
-        optimized = pathcleaner.clean_paths(geometry, **parameters)
+    for unit in process.layers_to_units(raw.keys()):
+        _, new = obtain_parameters(parameters, unit)
+        name = unit['name']
+        with open(f"{sys.argv[2]}-{name}.gcode",'w') as f:
+            for subname, layers in unit['subunits']:
+                gp = process.geometry_parameters((name,subname), parameters)
+                tol = gp['tolerance']
+                geo = []
+                
+                for layer in layers:
+                    for entity in raw[layer]:
+                        geo.append(entity.render_to_tolerance(tol))
 
-        with open(sys.argv[2] + '-' + unit + '.gcode','w') as f:
-            for x in process.generate_code(unit,optimized):
-                f.write(x + '\n')
+                geo = process.modify_geometry(geo, (name, subname), parameters)
+                del gp['tolerance']
+                optimized = pathcleaner.clean_paths(geo, **gp)
+                for x in process.generate_code((name, subname),optimized, parameters):
+                    f.write(x + '\n')
+
+    #for unit, layers in process.layers_to_units(raw.keys()).items():
+    #    parameters = process.geometry_parameters(unit)
+    #    tol = parameters['tolerance']
+    #    geometry = []
+    #    for layer in layers:
+    #        for entity in raw[layer]:
+    #            geometry.append(entity.render_to_tolerance(tol))
+    #        
+    #    del parameters['tolerance']
+    #    optimized = pathcleaner.clean_paths(geometry, **parameters)
+
+    #    with open(sys.argv[2] + '-' + unit + '.gcode','w') as f:
+    #        for x in process.generate_code(unit,optimized):
+    #            f.write(x + '\n')
