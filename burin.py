@@ -6,7 +6,9 @@ import shutil
 
 import pathcleaner
 import dxfloader
-import processes
+import importlib
+
+#import processes
 
 def get_blob(directory):
     blob = os.path.join(directory,"state.json")
@@ -29,6 +31,22 @@ def save_blob(directory, blob):
         json.dump(blob, f)
         
     return blob_path
+
+def load_process(process):
+    splat = process.split('.')
+    module,clss = '.'.join(splat[:-1]), splat[-1]
+
+    try:
+        mod = importlib.import_module(module)
+    except:
+        print(f"Unable to find module {module}")
+        exit(-1)
+
+    if clss not in mod.__dict__:
+        print(f"Unable to find process {clss} in module {module}")
+        exit(-1)
+        
+    return mod.__dict__[clss]()
 
     
 def check_parameters(blob, unit,prompt = True, reset = False):
@@ -74,8 +92,8 @@ def start(ctx, filepath, process, directory):
     if not os.path.exists(filepath):
         print(f"Input file {filepath} doesn't exist")
          
-    # Figure out how to do some magic to dynamically find a process
-    proc = processes.Multilayer()
+    
+    proc = load_process(process)
 
     # Establish that the output directory exists by saving a blank conf
     save_blob(directory, {})
@@ -130,7 +148,7 @@ def unit(ctx, unit, directory):
         exit(-1)
 
     # do magic to load the process def from the string in the json...
-    proc = processes.Multilayer()
+    proc = load_process(state['process'])
     
         
     unit_record = state['units'][state['stage'][unit]]
