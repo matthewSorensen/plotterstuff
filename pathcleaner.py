@@ -11,13 +11,12 @@ import math
 def clean_paths(paths, link = True, reverse = True, deduplicate = True, merge = True, reduce = None):
 
 
-    print(paths)
     if deduplicate:
         paths = list(remove_duplicates(paths))
-    print(paths)
+
     if link:
         paths = list(link_paths(paths, reverse = reverse))
-    print(paths)
+
     
     if merge is not None:
         paths = merge_paths(paths, merge)
