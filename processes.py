@@ -1,53 +1,61 @@
 import numpy as np
 
+
+class BaseProcess:
+
+    def __init__(self):
+        self.parameters = {}
+
+    def layers_to_units(self, layers):
+        """ Define what order layers are processed in, and which layers of geometry get
+        proccessed together. 
+        
+        Return a list of dicts containing the following fields:
+
+        * 'name' - the unit name
+        * 'subunits' - list of subunits: tuples of (name,list of layers). All geometry in a given subunit
+           will be optimized together, and passed to the code generator.
+        * 'parameters' - a list of parameters to be collected at runtime, immediately
+           before running the pipeline for a unit. Accessible as self.parameters['unit_name']['parameter_name'].
+
+        """
+        return [{"name": "all", "subunits" : [("all", layers)], "parameters" : []}]
+
+    def modify_geometry(self, unit_name, geometry):
+        """ Gives processes access to geometry after conversion to line segments, but before
+        linking and optimization. """
+        return geometry
+
+    def curve_resolution(self, unit_name):
+        """ How precisely should we convert curves to line segments? """
+
+        return 0.25
+    
+    def geometry_parameters(self, unit_name):
+        """ How should we process each layer - specifies a line segment length for conversion from
+        dxf geometry, and all of the parameters to the linker/optimizer/cleaner. """
+        return {'link': True, 'reverse' : True,
+                'deduplicate' : True,
+                'merge' : False, 'reduce' : None}
+
+    def generate_code(self, unit_name, segments):
+        """ Generate a stream of gcode from a list of numpy array path segments """
+        yield "; Nothing to see here!"
+
 def axes_dict(d):
     return ' '.join((v + str(x) for v,x in d.items()))
 
-class DefaultProcess:
+class SimpleProcess(BaseProcess):
+    """ Combines all layers into one step, and plots them unchanged """
 
-    def __init__(self):
-        pass
+    def modify_geometry(self,_,geo):
+        print("Modify")
+        v = np.array([173.6,126.7])
+        return list(x + v for x in geo)
 
-    def layers_to_units(self,layers):
-        return [{"name" : "all",
-                 "subunits" : [("all",layers)],
-                 "runtime" : []}]
-
-    def modify_geometry(self, geometry, unit_name, parameters):
-        return geometry
-
-    def geometry_parameters(self, unit_name, parameters):
-        return {'tolerance' : 0.1, 'link': True, 'reverse' : True, 'deduplicate' : True, 'merge' : True, 'reduce' : None}
-    
-    def generate_code(self, unit_name, segments, parameters):
-        speeds = self.speeds(unit_name)
-        plot, travel = speeds['plot'], speeds['travel']
-        i = -1
-        for i,seg in enumerate(segments):
-            if i == 0:
-                yield from self.prelude(unit_name, seg[0])
-                yield '; starting drawing'
-            else:
-                x,y = seg[0]
-                yield f"G0 X{x} Y{y} F{travel}"
-            
-            yield from self.start_drawing(unit_name)
-            for x,y in seg[1:]:
-                yield f"G1 X{x} Y{y} F{plot}"
-
-            yield from self.stop_drawing(unit_name)
-
-        yield from self.stop_drawing(unit_name)
-        yield '; done drawing'
-        
-        if i != -1:
-            yield from self.postlude(unit_name)
-
-
-            
     
     def speeds(self,unit_name):
-        return {'travel' : 10000, 'plot' : 5000, 'clearance' : 100}
+        return {'travel' : 10000, 'plot' : 2000, 'clearance' : 100}
     
     def heights(self,unit_name):
         return {'clearance' : {'Z' : 15}, 'travel' : {'V' : 4, 'Z' : 10}, 'plot' : {'V' : 5.5}}
@@ -72,19 +80,48 @@ class DefaultProcess:
         yield f"G0 {axes_dict(heights['clearance'])} F{speeds['clearance']}"
         yield "G28 V0"
         yield "T-1"
-
-    def start_drawing(self,unit_name):
-        height = self.heights(unit_name)['plot']['V']
-        yield f"G0 V{height} F4000"
+    
+    def generate_code(self, unit_name, segments):
         
-    def stop_drawing(self,unit_name):
-        height = self.heights(unit_name)['travel']['V']
-        yield f"G0 V{height} F4000"
+        speeds = self.speeds(unit_name)
+        up_height, down_height = self.heights(unit_name)['travel']['V'], self.heights(unit_name)['plot']['V']
+        plot, travel = speeds['plot'], speeds['travel']
+        i = -1
+        for i,seg in enumerate(segments):
+            if i == 0:
+                yield from self.prelude(unit_name, seg[0])
+                yield '; starting drawing'
+            else:
+                x,y = seg[0]
+                yield f"G0 X{x} Y{y} F{travel}"
+                
+            yield f"G0 V{down_height} F4000"
+            for x,y in seg[1:]:
+                yield f"G1 X{x} Y{y} F{plot}"
 
-
-
+            yield f"G0 V{up_height} F4000"
+    
+        yield '; done drawing'
         
-class Multipen(DefaultProcess):
+        if i != -1:
+            yield from self.postlude(unit_name)
+
+
+    
+class Multilayer(SimpleProcess):
+
+    def layers_to_units(self, layers):
+
+        units = []
+
+        for l in layers:
+            units.append({"name": ''.join(l.split()), "subunits" : [("all", [l])], "parameters" : ['x','y']})
+        units.reverse()
+        
+        return units
+    
+    
+class Multipen(SimpleProcess):
     
     def layers_to_units(self,layers):
         # Set a cannonical stored order, always processing the Default layer first...
@@ -182,4 +219,4 @@ class Multipen(DefaultProcess):
             yield from super().postlude(unit_name)
         else:
             yield from self.stop_drawing(unit_name)
-        
+   

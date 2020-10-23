@@ -8,8 +8,6 @@ import pathcleaner
 import dxfloader
 import importlib
 
-#import processes
-
 def get_blob(directory):
     blob = os.path.join(directory,"state.json")
     if not os.path.exists(blob):
@@ -179,17 +177,16 @@ def unit(ctx, unit, directory):
         
         for subname, layers in unit_record['subunits']:
             full_name = unit, subname
-            gparameters = proc.geometry_parameters(full_name)
-            tol = gparameters['tolerance']
-            del gparameters['tolerance']
-
+            gp = proc.geometry_parameters(full_name)
+            tol = proc.curve_resolution(full_name)     
             geo = []
             for layer in layers:
 
                 for entity in dxf_entities[layer]:
                     geo.append(entity.render_to_tolerance(tol))
             
-            optimized = pathcleaner.clean_paths(geo,**gparameters)
+            geo = proc.modify_geometry(full_name, geo)
+            optimized = pathcleaner.clean_paths(geo,**gp)
             for x in proc.generate_code(full_name, optimized):
                 f.write(x + '\n')
 
