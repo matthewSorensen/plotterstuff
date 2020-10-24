@@ -63,9 +63,8 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
     yield paths[0]
     live[0:2] = 0
     prev = 1 # index into endpoints
-    exit_vector = paths[0][-1] - paths[0][-2]
-    exit_vector /= math.sqrt(exit_vector.dot(exit_vector))
-
+    exit_vector = -1 * direction_vector(None,paths[0],1)
+    
     # Build the tree for the first time
     tree = KDTree(endpoints[live == 1,:])
     indexes = real_indexes[live == 1]
@@ -79,13 +78,12 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
         if result is not None:
             rebuild = False
             path, base, parity = result
+            exit_vector = -1 * direction_vector(exit_vector, path, (1 + parity) % 2)
             # Emit the section with correct flipping
             if parity:
                 path = np.flip(path, axis = 0)
             yield path
-            exit_vector = path[-1] - path[-2]
-            exit_vector /= math.sqrt(exit_vector.dot(exit_vector))
-        
+    
             # Set both of its ends as dead
             live[base] = 0
             live[base + 1] = 0
@@ -99,7 +97,34 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
                 print(f"Rebuilding ({n} / {len(paths)})")
             tree = KDTree(endpoints[live == 1,:])
             indexes = real_indexes[live == 1]
- 
+
+def direction_vector(previous_vector, path, parity):
+    n,_ = path.shape
+
+    if n == 1:
+        if previous_vector is not None:
+            # If we're using this for ranking candidates, we should always go with a point!
+            # Otherwise, if we're using this for the next round, a point doesn't change the
+            # backlash state, so we leave it unchanged
+            return previous_vector
+        else:
+            # Only happens if a point is the first segment
+            # and doesn't really matter
+            return np.zeros(2)
+    v = None
+    if parity:
+        v = path[1] - path[0] 
+    else:
+        v = path[-2] - path[-1]
+
+    norm = math.sqrt(v.dot(v))
+    if norm != 0:
+        return v / norm
+    
+    return v # Again, zero vectors aren't horrid here
+    
+
+            
 def rank_paths(query_results,live,vector, paths, indexes, epsilon = 1e-10):
     """ If there are live vectors at 0 distance, return the one 
     pointing in the best direction. Otherwise, the closest"""
@@ -119,9 +144,9 @@ def rank_paths(query_results,live,vector, paths, indexes, epsilon = 1e-10):
             if not alive:
                 continue
             path = paths[base // 2]
-            v = path[0] - path[1] if parity else path[-2] - path[-1]
-            v /= math.sqrt(v.dot(v))
-            cosine = v.dot(vector)
+
+            cosine = direction_vector(vector, path, parity).dot(vector)
+            
             if best_cosine <= cosine:
                 best_cosine = cosine
                 best = path, base, parity
@@ -147,6 +172,11 @@ def merge_paths(paths, staydown):
     for p in paths:
         if prev is None:
             prev = [p]
+            continue
+        if p.shape[0] == 1:
+            yield np.concatenate(prev)
+            yield p # We can just go ahead and yield this too
+            prev = None
             continue
         # We know this is shorter than to the end point, if
         # the linking algorithm was used

@@ -166,13 +166,12 @@ def unit(ctx, unit, directory):
     if errors:
         print("Error loading dxf:")
         for x in errors:
-            print("    ", x)
+            print("    ", x[0])
         exit(-1)
     # Give the newly-reconstituted process a little context as to what's happening
     proc.parameters = state['parameters']
     proc.units = state['units']
 
-    
     with open(os.path.join(directory, unit + ".gcode"),'w') as f:
         
         for subname, layers in unit_record['subunits']:

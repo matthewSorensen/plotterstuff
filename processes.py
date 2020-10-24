@@ -36,7 +36,7 @@ class BaseProcess:
         dxf geometry, and all of the parameters to the linker/optimizer/cleaner. """
         return {'link': True, 'reverse' : True,
                 'deduplicate' : True,
-                'merge' : False, 'reduce' : None}
+                'merge' : True, 'reduce' : None}
 
     def generate_code(self, unit_name, segments):
         """ Generate a stream of gcode from a list of numpy array path segments """
@@ -49,10 +49,8 @@ class SimpleProcess(BaseProcess):
     """ Combines all layers into one step, and plots them unchanged """
 
     def modify_geometry(self,_,geo):
-        print("Modify")
         v = np.array([173.6,126.7])
         return list(x + v for x in geo)
-
     
     def speeds(self,unit_name):
         return {'travel' : 10000, 'plot' : 2000, 'clearance' : 100}

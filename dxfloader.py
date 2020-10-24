@@ -1,6 +1,8 @@
 import ezdxf
+from geomdl import BSpline
 import numpy as np
 from collections import defaultdict
+import math
 
 class Spline:
     def __init__(self,degree, control, knots):
@@ -44,6 +46,18 @@ class Polyline:
         if line.dxf.flags & 1:
             vertices.append(vertices[0])
         return Polyline(np.array(vertices))
+
+class Point:
+
+    def __init__(self, coords):
+        self.coords = coords
+        
+    def render_to_tolerance(self, _):
+        return self.coords[0:2].reshape((1,2))
+
+    @staticmethod
+    def from_dxf(point):
+        return Point(np.array(point.dxf.location))
 
 def load_layers(fp, remove_empty = True):
     doc = ezdxf.readfile(fp)
@@ -96,6 +110,8 @@ def load_entities(fp, layers):
             e.to_spline(replace = False)
         elif isinstance(e, ezdxf.entities.Spline):
             objects[key].append(Spline.from_dxf(e))
+        elif isinstance(e, ezdxf.entities.Point):
+            objects[key].append(Point.from_dxf(e))
         else:
             errors.append((f"Unsupported dxf object - {e}",e.dxf.handle))
             
