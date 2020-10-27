@@ -5,7 +5,6 @@ from collections import defaultdict
 import burin.dxftypes as dxftypes
 
 
-
 def load_layers(fp, remove_empty = True):
     doc = ezdxf.readfile(fp)
     layers = [] # something is up with ezdxf, and I can't simply yield the layers as an iterator

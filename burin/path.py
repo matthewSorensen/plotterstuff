@@ -1,34 +1,26 @@
 from scipy.spatial import KDTree
 import numpy as np
 import math
+from burin.types import pointwise_equal
 
 
-
-# stages:
-# throw out duplicates
-# link paths (also reorder for merge)
-# merge
-# reduce segments
-
-def clean_paths(paths, link = True, reverse = True, deduplicate = True, merge = True, reduce = None):
+def clean_paths(paths, link = True, reverse = True, deduplicate = True, merge = True):
 
 
     if deduplicate:
         paths = list(remove_duplicates(paths))
+
 
     if link:
         paths = list(link_paths(paths, reverse = reverse))
 
     
     if merge is not None:
-        paths = merge_paths(paths, merge)
+        return list(merge_paths(paths, merge))
+    else:
+        return list([p] for p in paths)
 
 
-    if reduce is not None:
-
-        paths = (reduce_points(iter(p), reduce) for p in paths)
-
-    return list(paths)
     
 # We are highly lazy and pragmatic, and are gonna do something stupid with pretending scikit's
 # KDTrees are dynamic...
@@ -58,14 +50,16 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
         
     endpoints = np.empty((2 * n, 2))
     for i, path in enumerate(paths):
-        endpoints[2 * i, :] = path[0]
-        endpoints[2 * i + 1, :] = path[-1]
+        a,b = path.endpoints()
+        endpoints[2 * i, :] = a[0], a[1]
+        endpoints[2 * i + 1, :] = b[0], b[1]
+        
     real_indexes = np.arange(len(live)) # Original indexes
     # Start with the first path provided - you have to start somewhere...
     yield paths[0]
     live[0:2] = 0
     prev = 1 # index into endpoints
-    exit_vector = -1 * direction_vector(None,paths[0],1)
+    exit_vector = -1 * paths[0].entrance_vector(None, True)
     
     # Build the tree for the first time
     tree = KDTree(endpoints[live == 1,:])
@@ -80,10 +74,11 @@ def link_paths(paths, reverse = True, k = 20, log_rebuilds = False):
         if result is not None:
             rebuild = False
             path, base, parity = result
-            exit_vector = -1 * direction_vector(exit_vector, path, (1 + parity) % 2)
+            exit_vector = -1 * path.entrance_vector(exit_vector, parity == 0)
             # Emit the section with correct flipping
             if parity:
-                path = np.flip(path, axis = 0)
+                path.flip()
+                
             yield path
     
             # Set both of its ends as dead
@@ -147,7 +142,7 @@ def rank_paths(query_results,live,vector, paths, indexes, epsilon = 1e-10):
                 continue
             path = paths[base // 2]
 
-            cosine = direction_vector(vector, path, parity).dot(vector)
+            cosine = path.entrance_vector(vector, parity == 1).vector()
             
             if best_cosine <= cosine:
                 best_cosine = cosine
@@ -169,42 +164,33 @@ def merge_paths(paths, staydown):
     by short rapids """
     staydown = staydown**2
 
-    prev = None
+    point, group, prev = None, None, None
 
     for p in paths:
+        # Start a new group!
         if prev is None:
-            prev = [p]
+            group = [p]
+            prev = p
+            point = p.endpoints()[1]
             continue
-        if p.shape[0] == 1:
-            yield np.concatenate(prev)
-            yield p # We can just go ahead and yield this too
-            prev = None
-            continue
-        # We know this is shorter than to the end point, if
-        # the linking algorithm was used
-        delta = prev[-1][-1] - p[0]
-        if delta.dot(delta) < staydown:
-            prev.append(p)
-        else:
-            yield np.concatenate(prev)
-            prev = [p]
-            
-    if prev is not None:    
-        yield np.concatenate(prev)
-    
-def polyline_length(line):
-    acc = 0
-    n, _ = line.shape
-    for i in range(1,n):
-        delta = line[i] - line[i - 1]
-        acc += np.sqrt(delta.dot(delta))
-        
-    return acc
 
-def pointwise_equal(a,b, epsilon):
-    if len(a) != len(b):
-        return False
-    return np.all(np.abs(a - b) < epsilon)
+        start, end = p.endpoints()
+        delta = point - start
+        
+        if delta.dot(delta) < staydown and prev.can_join(p) and p.can_join(prev):
+            point = end
+            group.append(p)
+            prev = p
+        else:
+            yield group
+            group = [p]
+            point = end
+            prev = p
+            
+    if group is not None:
+        yield group
+        
+
 
 def find_runs(lengths, epsilon):
     idx = np.argsort(lengths)
@@ -232,7 +218,7 @@ def tree_search_endpoints(paths, group, epsilon):
     # representing the box spanned by their endpoints
     for i, g in enumerate(group):
         p = paths[g]
-        (a,b),(c,d) = p[0], p[-1]    
+        (a,b),(c,d)= p.endpoints()
         points[i] = min(a,c), max(a,c), min(b,d), max(b,d)
     live = np.ones(n, dtype = int)
     tree = KDTree(points)
@@ -266,7 +252,7 @@ def remove_duplicates(paths, epsilon = 1e-6):
     keep = np.ones(n, dtype = int)
     lengths = np.empty(n)
     for i in range(n):
-        lengths[i] = polyline_length(paths[i])
+        lengths[i] = paths[i].length_hash()
     
     for group in find_runs(lengths, epsilon):
         if len(group) == 2:

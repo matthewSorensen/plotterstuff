@@ -33,8 +33,7 @@ class BaseProcess:
         """ How should we process each layer - specifies a line segment length for conversion from
         dxf geometry, and all of the parameters to the linker/optimizer/cleaner. """
         return {'link': True, 'reverse' : True,
-                'deduplicate' : True,
-                'merge' : True, 'reduce' : None}
+                'deduplicate' : True, 'merge' : True}
 
     def generate_code(self, unit_name, segments):
         """ Generate a stream of gcode from a list of numpy array path segments """
