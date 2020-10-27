@@ -4,8 +4,8 @@ import json
 import os
 import shutil
 
-import pathcleaner
-import dxfloader
+import burin.path as pathcleaner
+import burin.dxfloader as dxfloader
 import importlib
 
 def get_blob(directory):

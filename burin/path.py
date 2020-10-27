@@ -2,6 +2,8 @@ from scipy.spatial import KDTree
 import numpy as np
 import math
 
+
+
 # stages:
 # throw out duplicates
 # link paths (also reorder for merge)
