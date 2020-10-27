@@ -160,9 +160,12 @@ def unit(ctx, unit, directory):
         print(f"Unspecified parameters for unit {unit}")
         exit(-1)
 
+    loading_params = proc.conversion_parameters()
+
     # Load all of the dxf entities we'll need for this unit
+    layers = set().union(*(set(x) for _,x in unit_record['subunits']))
     dxf_entities, errors = dxfloader.load_entities(os.path.join(directory, 'input.dxf'),
-                                                   set().union(*(set(x) for _,x in unit_record['subunits'])))
+                                                   layers, arcs = loading_params['arcs'])
     if errors:
         print("Error loading dxf:")
         for x in errors:
@@ -176,13 +179,12 @@ def unit(ctx, unit, directory):
         
         for subname, layers in unit_record['subunits']:
             full_name = unit, subname
-            gp = proc.geometry_parameters(full_name)
-            tol = proc.curve_resolution(full_name)     
+            gp = proc.geometry_parameters(full_name) 
             geo = []
             for layer in layers:
 
                 for entity in dxf_entities[layer]:
-                    geo.append(entity.render_to_tolerance(tol))
+                    geo.append(entity.render_to_tolerance(loading_params['resolution']))
             
             geo = proc.modify_geometry(full_name, geo)
             optimized = pathcleaner.clean_paths(geo,**gp)

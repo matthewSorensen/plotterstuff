@@ -4,6 +4,12 @@ class BaseProcess:
     def __init__(self):
         self.parameters = {}
 
+    def conversion_parameters(self):
+        # Right now, two configurable parameters - should we convert arcs to line segments,
+        # and how long (maximum) should line segments generated from curves be?
+        return {'arcs' : True, 'resolution' : 0.25}
+
+
     def layers_to_units(self, layers):
         """ Define what order layers are processed in, and which layers of geometry get
         proccessed together. 
@@ -23,11 +29,6 @@ class BaseProcess:
         """ Gives processes access to geometry after conversion to line segments, but before
         linking and optimization. """
         return geometry
-
-    def curve_resolution(self, unit_name):
-        """ How precisely should we convert curves to line segments? """
-
-        return 0.25
     
     def geometry_parameters(self, unit_name):
         """ How should we process each layer - specifies a line segment length for conversion from
