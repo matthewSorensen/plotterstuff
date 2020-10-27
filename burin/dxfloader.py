@@ -26,13 +26,15 @@ def load_layers(fp, remove_empty = True):
     
     return layers
 
-def load_entities(fp, layers):
+def load_entities(fp, layers, circles = True):
     """ Load a subset of a dxf file """
     msp = ezdxf.readfile(fp).modelspace()
     objects = defaultdict(lambda: [])
     errors = []
 
-    splinable = ezdxf.entities.Arc, ezdxf.entities.Circle,  ezdxf.entities.Ellipse
+    splinable = ezdxf.entities.Ellipse
+    if not circles:
+        splinable = ezdxf.entities.Arc, ezdxf.entities.Circle,  ezdxf.entities.Ellipse
 
     layers = set(layers)
     
@@ -54,6 +56,8 @@ def load_entities(fp, layers):
             # and appends it to the end of the file (instead of in place),
             # so we don't have to worry at all!
             e.to_spline(replace = False)
+        elif isinstance(e, ezdxf.entities.Circle): # Also covers arcs...
+            objects[key].append(dxftypes.Arc.from_dxf(e)) 
         elif isinstance(e, ezdxf.entities.Spline):
             objects[key].append(dxftypes.Spline.from_dxf(e))
         elif isinstance(e, ezdxf.entities.Point):

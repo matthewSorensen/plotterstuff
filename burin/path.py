@@ -142,7 +142,7 @@ def rank_paths(query_results,live,vector, paths, indexes, epsilon = 1e-10):
                 continue
             path = paths[base // 2]
 
-            cosine = path.entrance_vector(vector, parity == 1).vector()
+            cosine = path.entrance_vector(vector, parity == 1).dot(vector)
             
             if best_cosine <= cosine:
                 best_cosine = cosine
