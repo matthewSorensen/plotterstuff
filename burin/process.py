@@ -34,8 +34,18 @@ class BaseProcess:
         """ How should we process each layer - specifies a line segment length for conversion from
         dxf geometry, and all of the parameters to the linker/optimizer/cleaner. """
         return {'link': True, 'reverse' : True,
-                'deduplicate' : True, 'merge' : True}
+                'deduplicate' : True, 'merge' : 0.1}
 
     def generate_code(self, unit_name, segments):
         """ Generate a stream of gcode from a list of numpy array path segments """
         yield "; Nothing to see here!"
+
+
+    # No need to override this for customization
+    def subunit_position(self,name):
+        """ Returns a pair of booleans, indicating if the specified subunit is the first (1st return value),
+        and last (2nd) subunit in its unit """
+        unit,sub = name
+        subunits = self.units[self.stage[unit]]['subunits']
+        
+        return sub == subunits[0][0], sub == subunits[-1][0] 

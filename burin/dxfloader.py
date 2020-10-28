@@ -26,14 +26,14 @@ def load_layers(fp, remove_empty = True):
     
     return layers
 
-def load_entities(fp, layers, circles = True):
+def load_entities(fp, layers, arcs = True):
     """ Load a subset of a dxf file """
     msp = ezdxf.readfile(fp).modelspace()
     objects = defaultdict(lambda: [])
     errors = []
 
     splinable = ezdxf.entities.Ellipse
-    if not circles:
+    if not arcs:
         splinable = ezdxf.entities.Arc, ezdxf.entities.Circle,  ezdxf.entities.Ellipse
 
     layers = set(layers)

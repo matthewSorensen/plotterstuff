@@ -174,6 +174,7 @@ def unit(ctx, unit, directory):
     # Give the newly-reconstituted process a little context as to what's happening
     proc.parameters = state['parameters']
     proc.units = state['units']
+    proc.stage = state['stage']
 
     with open(os.path.join(directory, unit + ".gcode"),'w') as f:
         
@@ -191,7 +192,8 @@ def unit(ctx, unit, directory):
             for x in proc.generate_code(full_name, optimized):
                 f.write(x + '\n')
 
-
+    # After processing the geometry, we may have changed parameters
+    save_blob(directory, state)
         
     
 if __name__ == '__main__':
