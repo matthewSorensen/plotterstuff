@@ -1,11 +1,15 @@
 import numpy as np
 import math
+import cmath
 
 def transform_point(point, matrix):
     return matrix @ np.hstack([point,1]).T
 
 def subdet(m):
     return m[0,0] * m[0,1] - m[0,1] * m[1,0]
+
+def angle(point):
+    return (180 / math.pi) * math.atan2(point[1], point[0])
 
 
 def pointwise_equal(a,b, epsilon):
@@ -58,13 +62,18 @@ class Segment:
     def length_hash(self):
         """ Used only for speeding up deduplcation - as long as duplicate curves return the same value,
         anything goes. Different curves may also return the same values. """
-        return 0
+        return self.mean()[0]
 
+    def mean(self):
+        return 0, None
+
+    def add_to_drawing(self, drawing):
+        pass
 
 class Point (Segment):
 
     def __init__(self, coords):
-        self.coords = np.array([coords[0,0],coords[0,1]])
+        self.coords = np.array([coords[0],coords[1]])
 
     def transform(self, matrix):
         self.coords = transform_point(self.coords, matrix)
@@ -80,8 +89,18 @@ class Point (Segment):
     def endpoints(self):
         return self.coords, self.coords
 
-    
-class Polyline:
+    def mean(self):
+        # Don't weight this at all...
+        return 0, self.coords
+
+    def add_to_drawing(self, drawing):
+            return drawing.add_point(self.coords)
+        
+    def linearize_to(self, _):
+        yield self.coords
+        yield self.coords
+        
+class Polyline (Segment):
     
     def __init__(self, coords):
         self.coords = coords
@@ -103,15 +122,40 @@ class Polyline:
     def can_join(self, other):
         return True # We'll join anything else that can be joined...
 
-    def length_hash(self):
-        acc = 0
-        n, _ = self.coords.shape
+    def mean(self):
+        n, m = self.coords.shape
+        length, center = 0, np.zeros(m)
+
         for i in range(1,n):
-            delta = self.coords[i] - self.coords[i - 1]
-            acc += np.sqrt(delta.dot(delta))
-        return acc
+            a,b = self.coords[i], self.coords[i - 1]
+            delta = a - b
+            l = np.sqrt(delta.dot(delta))
+            length += l
+            center += l * 0.5 * (a + b)
+        if length == 0:
+            return 0, self.coords[0,:]
+
+        return length, center / length
+
+    def add_to_drawing(self, drawing):
+            return drawing.add_polyline2d(self.coords[:,0:2])
+
+    def linearize_to(self, tolerance):
+
+        n,_ = self.coords.shape
+        for i in range(n-1):
+            start, end = self.coords[i], self.coords[i + 1]
+            delta = end - start
+            length = np.sqrt(delta.dot(delta))
+            yield start
         
-class Arc:
+            for x in np.linspace(0, length, int(np.ceil(length / tolerance)) + 1, endpoint = False)[1:]:
+                yield start + x * delta
+            
+        yield end
+
+        
+class Arc (Segment):
     
     def __init__(self, start, end, center, clockwise = True):
         self.start = start
@@ -149,6 +193,8 @@ class Arc:
         v = np.array([v[1],0 - v[0]])
         if flip:
             v *= -1
+        if exit_vector:
+            v *= -1
             
         return v / math.sqrt(v.dot(v))
     
@@ -158,8 +204,64 @@ class Arc:
     def can_join(self, other):
         return True # We'll join anything else that can be joined...
 
-    
-    def length_hash(self):
-        ab, bc, ca = self.start - self.center, self.center - self.end, self.end - self.start
+    def complexify(self):
+        a,b  = self.start - self.center, self.end - self.center
+        a,b = a[0] + 1j * a[1], b[0] + 1j * b[1]
+        d = b / a
+        if self.clockwise:
+            d *= -1
+        return a,b,d
         
-        return math.sqrt(ab.dot(ab)) + math.sqrt(bc.dot(bc)) + math.sqrt(ca.dot(ca))
+    
+
+    def mean(self):
+        # Complexify everything
+        a,b  = self.start - self.center, self.end - self.center
+        a,b = a[0] + 1j * a[1], b[0] + 1j * b[1]
+        r = abs(a)
+        # Bisect the arc!
+        d = cmath.sqrt(b / a) * a
+        if self.clockwise:
+            d *= -1
+        # Compute half of the angle of the arc
+        alpha = np.arccos((d.real * a.real + d.imag * a.imag) / (r * abs(d)))
+        if alpha < 1e-18:
+            return 2 * math.pi * r, self.center
+        # Use the cute little integration result to find the centroid
+        c = d * np.sin(alpha) / alpha
+    
+        return 2 * r * alpha, self.center + np.array([c.real, c.imag])
+
+    
+    def add_to_drawing(self, drawing):
+        
+        delta = self.start - self.center
+        r = np.sqrt(delta.dot(delta))
+        if max(np.abs(self.start - self.end)) < 1e-18:
+            return drawing.add_circle(self.center, r)
+        else:
+            return drawing.add_arc(self.center, np.sqrt(delta.dot(delta)),
+                            angle(delta), angle(self.end - self.center),
+                            is_counter_clockwise = not self.clockwise)
+    def linearize_to(self, tolerance):
+
+        # Complexify everything
+        a,b  = self.start - self.center, self.end - self.center
+        r = math.sqrt(a.dot(a))
+        cos = math.acos(a.dot(b) / math.sqrt(a.dot(a) * b.dot(b)))
+        det = a[0] * b[1] - a[1] * b[0]
+
+        if det < 0:
+            cos = 2 * math.pi - cos
+        elif cos < 1e-18:
+            cos = 2 * math.pi
+            # Ok, that's if the angle is counterclockwise    
+        if self.clockwise:
+            cos = 2 * math.pi - cos
+        start = math.atan2(a[1],a[0])
+        span = np.linspace(0, cos, int(0.5 + r * cos / tolerance))
+        if self.clockwise:
+            span *= -1
+            
+        for p in span:
+            yield self.center + np.array([r * math.cos(start + p),r * math.sin(start + p)])

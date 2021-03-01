@@ -55,7 +55,8 @@ class Point:
         self.coords = coords
         
     def render_to_tolerance(self, _):
-        return burin.types.Point(self.coords[0:2].reshape((1,2)))
+        a,b = self.coords[0:2]
+        return burin.types.Point((a,b))
 
     @staticmethod
     def from_dxf(point):

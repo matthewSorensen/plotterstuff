@@ -1,3 +1,18 @@
+def cannonical_order(layers):
+    """ Take a bunch of layer names, and sort them consistently - first, all of the
+    layer names that are parsable as integers, in ascending order. Then, the rest of the layer names,
+    in lexicographical order.
+    """
+
+    good, bad = [], []
+    for l in layers:
+        try:
+            good.append((l,int(l)))
+        except:
+            bad.append(l)
+    return [x[0] for x in sorted(good, key = lambda x: x[1])] + list(sorted(bad))
+
+
 
 class BaseProcess:
 
