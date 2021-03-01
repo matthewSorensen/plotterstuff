@@ -1,6 +1,6 @@
 import burin.process
 import burin.types
-import burin.codegen as cg
+import burin.codegen
 import numpy as np
 
 
@@ -26,20 +26,18 @@ class Pencil(burin.process.BaseProcess):
         x,y = float(para['x']), float(para['y'])
         
         first, last = self.subunit_position(unit_name)
-        heights, speeds = cg.heights(), cg.speeds()
-        speeds['plot'] *= 1.5
+
+        cg = burin.codegen.GCodeGen()
 
         if first:
-            yield from cg.start_plot(heights, speeds)
-
-        yield from cg.go_to_clearance(heights, speeds)
-        yield f'G0 X{x} Y{y} F{speeds["travel"]}'
-        yield from cg.prompt_pen_change(heights, speeds)
-        yield from cg.go_to_travel(heights, speeds)
+            yield from cg.start_plot()
+            yield f'G0 X{x} Y{y} F{cg.speeds["travel"]}'
+            yield from cg.prompt_pen_change()
+            yield from cg.go_to_travel()
 
         for s in segments:
-            yield from cg.generate_segment(s, heights, speeds)
+            yield from cg.generate_segment(s)
         
         if last:
-            yield from cg.finish_plot(heights, speeds)
+            yield from cg.finish_plot()
             
