@@ -26,6 +26,12 @@ class GCodeGen:
                 n = 1 if i == 0 else 0
                 for x,y in seg.coords[n:]:
                     yield f"G1 X{x} Y{y} F{plot}"
+
+            elif isinstance(seg, burin.types.BSpline):
+                
+                n = 1 if i == 0 else 0
+                for x,y in seg.linearize_for_drawing()[n:]:
+                    yield f"G1 X{x} Y{y} F{plot}"
                           
             elif isinstance(seg, burin.types.Arc):
                 start, end = seg.endpoints()

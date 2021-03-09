@@ -24,7 +24,7 @@ def pointwise_equal(a,b, epsilon):
         
         return np.all(np.abs(a.coords - b.coords) < epsilon)
 
-    elif isinstancef(a, Arc):
+    elif isinstance(a, Arc):
 
         delta = max(np.max(np.abs(a.start - b.start)),
                     np.max(np.abs(a.end - b.end)),
@@ -33,6 +33,40 @@ def pointwise_equal(a,b, epsilon):
         return delta < epsilon and a.clockwise == b.clockwise
 
     return False
+
+def reverse_knot_vector(knots):
+    """ It seems like people do this in a few ways, but this is equivalent, 
+    fast, inplace, and simple.
+    
+    (https://sourceforge.net/p/octave/nurbs/ci/default/tree/inst/nrbreverse.m)
+    (https://github.com/pboyer/verb/blob/master/src/verb/eval/Modify.hx#L74)"""
+    
+    n = len(knots)
+    m = n // 2
+    last = knots[-1]
+    for i in range(m):
+        other = n - i - 1
+        tmp = last - knots[i]
+        knots[i] = last - knots[other] 
+        knots[other] = tmp
+    if n != m * 2:
+        knots[m] = last - knots[m]
+
+
+def polyline_mean(pts):
+    length = 0
+    acc = np.zeros(2)
+    n,_ = pts.shape
+    for i in range(n -1):
+        a,b = pts[i + 1], pts[i]
+        delta = a - b
+        mean = 0.5 * (a + b)
+        l = np.sqrt(delta.dot(delta))
+        length += l
+        acc += l * mean
+        
+    return length, acc / length
+
 
 class Segment:
 
@@ -154,6 +188,56 @@ class Polyline (Segment):
             
         yield end
 
+class BSpline(Segment):
+    """ A thin wrapper over NURBS-python's BSpline curve """
+
+    def __init__(self, bspline, tolerance):
+        
+        self.crv = bspline
+        self.pts = np.array(self.crv.ctrlpts)[:,0:2]
+        self.tolerance = tolerance
+        
+    def transform(self, matrix):
+        """ Transform this object with a 2x3 matrix """
+        n,_ = self.pts.shape
+        self.pts = np.hstack([self.pts, np.ones((n,1))]) @ matrix.T
+        self.crv.ctrpts = self.pts.tolist()
+    
+    def flip(self):
+        # Simple enough!
+        reverse_knot_vector(self.crv.knotvector)
+        self.crv.ctrlpts.reverse()
+        self.pts = np.flip(self.pts, axis =  0)
+    
+    def entrance_vector(self, previous, exit_vector = False):
+        pts = self.crv.ctrlpts
+        a,b = (pts[-1], pts[-2]) if exit_vector else (pts[1], pts[0])
+        delta = np.array([a[0] - b[0], a[1] - b[1]])
+        delta /= np.sqrt(delta.dot(delta))
+        return delta
+        
+    
+    def endpoints(self):
+        start,end = self.crv.evaluate_list([0,1])
+        return np.array(start[0:2]), np.array(end[0:2])
+    
+    def can_join(self, other):
+        return True
+    
+    def length_hash(self):
+        # Doesn't need to be at all exact - the length of the control points
+        # is a good upper bound...
+        return polyline_mean(self.pts)[0]
+
+    def mean(self):
+        # Compute this a bit more accurately - but not neccesarily at the final resolution
+        return polyline_mean(np.array(self.crv.evalpts))
+
+    def linearize_for_drawing(self):
+
+        self.crv.sample_size = max(2, math.ceil(self.length_hash() / self.tolerance))
+        return np.array(self.crv.evalpts)[:,0:2]
+    
         
 class Arc (Segment):
     
@@ -211,8 +295,6 @@ class Arc (Segment):
         if self.clockwise:
             d *= -1
         return a,b,d
-        
-    
 
     def mean(self):
         # Complexify everything

@@ -28,8 +28,8 @@ class Spline:
         curve.knotvector = self.knots.tolist()
         curve.sample_size = max(2, math.ceil(self.length_upper_bound() / tolerance))
 
-        return burin.types.Polyline(np.array(curve.evalpts)[:,0:2])
-        
+        return burin.types.BSpline(curve, tolerance)
+    
     @staticmethod
     def from_dxf(s):
         return Spline(s.dxf.degree, s.control_points, s.knots)
