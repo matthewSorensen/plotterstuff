@@ -19,6 +19,8 @@ class Pencil(burin.process.BaseProcess):
 
         cg = burin.codegen.GCodeGen()
 
+        cg.heights['v_down'] = 5.25
+
         if first:
             yield from cg.start_plot()
             yield f'G0 X{x} Y{y} F{cg.speeds["travel"]}'
@@ -54,7 +56,7 @@ class Watercolor(burin.process.BaseProcess):
         if first:
             yield from cg.start_plot()
             yield from cg.go_to_travel()
-            
+
         for s in segments:
             
             yield f"G1 X{x} Y{y} F{cg.speeds['travel']}"
