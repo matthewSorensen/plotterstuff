@@ -1,3 +1,5 @@
+import os
+
 def cannonical_order(layers):
     """ Take a bunch of layer names, and sort them consistently - first, all of the
     layer names that are parsable as integers, in ascending order. Then, the rest of the layer names,
@@ -19,6 +21,12 @@ class BaseProcess:
     def __init__(self):
         self.parameters = {}
 
+    def write_file(self, directory, unit, events):
+        with open(os.path.join(directory, unit + ".gcode"),'w') as f:
+            for x in events:
+                f.write(x + '\n')
+
+        
     def conversion_parameters(self):
         # Right now, two configurable parameters - should we convert arcs to line segments,
         # and how long (maximum) should line segments generated from curves be?

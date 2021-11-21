@@ -1,7 +1,7 @@
 import burin.process
 import burin.types
 import numpy as np
-
+import os
 import math
 
 def arc_to_representation(arc,speed):
@@ -32,6 +32,12 @@ def arc_to_representation(arc,speed):
 
 class FiberLaser(burin.process.BaseProcess):
 
+    def write_file(self, directory, unit, events):
+        with open(os.path.join(directory, unit + ".txt"),'w') as f:
+            for x in events:
+                f.write(x + '\n')
+
+    
     def layers_to_units(self, layers):        
         order = reversed(burin.process.cannonical_order(layers))
         return [{"name": "all", "subunits" : [(x,[x]) for x in order], "parameters" : ['engrave_power','engrave_speed','cut_power','cut_speed','cut_wobble','cut_passes']}]

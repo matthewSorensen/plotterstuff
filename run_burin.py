@@ -176,7 +176,12 @@ def unit(ctx, unit, directory):
     proc.units = state['units']
     proc.stage = state['stage']
 
-    with open(os.path.join(directory, unit + ".gcode"),'w') as f:
+
+
+    def seg_gen():
+
+    
+    #with open(os.path.join(directory, unit + ".gcode"),'w') as f:
         
         for subname, layers in unit_record['subunits']:
             full_name = unit, subname
@@ -190,8 +195,11 @@ def unit(ctx, unit, directory):
             geo = proc.modify_geometry(full_name, geo)
             optimized = pathcleaner.clean_paths(geo,**gp)
             for x in proc.generate_code(full_name, optimized):
-                f.write(x + '\n')
+                yield x
+                #f.write(x + '\n')
 
+    proc.write_file(directory, unit, seg_gen())
+                
     # After processing the geometry, we may have changed parameters
     save_blob(directory, state)
         
