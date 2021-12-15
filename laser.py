@@ -4,6 +4,8 @@ import numpy as np
 import os
 import math
 
+from pewpew.laser_events import laser_line
+
 def arc_to_representation(arc,speed):
 
     
@@ -35,8 +37,7 @@ class FiberLaser(burin.process.BaseProcess):
     def write_file(self, directory, unit, events):
         with open(os.path.join(directory, unit + ".txt"),'w') as f:
             for x in events:
-                f.write(x + '\n')
-
+                print(x)
     
     def layers_to_units(self, layers):        
         order = reversed(burin.process.cannonical_order(layers))
@@ -85,8 +86,6 @@ class FiberLaser(burin.process.BaseProcess):
                             yield f"line {coords[i-1,0]} {coords[i-1,1]} {coords[i,0]} {coords[i,1]} {speed}"
 
                     elif isinstance(seg, burin.types.Arc):
-
-                        #if max(abs(seg.center)) > 20:
 
                         coords = np.array(list(seg.linearize_to(0.05)))
                         for i in range(1,len(coords)):

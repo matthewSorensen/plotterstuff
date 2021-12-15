@@ -138,6 +138,9 @@ def list(ctx, directory):
 @click.argument('directory')
 @click.pass_context
 def unit(ctx, unit, directory):
+    run_unit(unit, directory)
+
+def run_unit(unit, directory):
     
     state = get_blob(directory)
 
@@ -180,8 +183,6 @@ def unit(ctx, unit, directory):
 
     def seg_gen():
 
-    
-    #with open(os.path.join(directory, unit + ".gcode"),'w') as f:
         
         for subname, layers in unit_record['subunits']:
             full_name = unit, subname
@@ -196,13 +197,21 @@ def unit(ctx, unit, directory):
             optimized = pathcleaner.clean_paths(geo,**gp)
             for x in proc.generate_code(full_name, optimized):
                 yield x
-                #f.write(x + '\n')
 
     proc.write_file(directory, unit, seg_gen())
                 
     # After processing the geometry, we may have changed parameters
     save_blob(directory, state)
         
+
+@main.command()
+@click.argument('directory')
+@click.pass_context
+def all(ctx, directory):
+    state = get_blob(directory)
+    for stage,_ in sorted(state['stage'].items(), key = lambda x: x[1]):
+        print(f"Processing {stage}")
+        run_unit(stage, directory)
     
 if __name__ == '__main__':
     main(obj = {})

@@ -10,8 +10,7 @@ def subdet(m):
 
 def angle(point):
     return (180 / math.pi) * math.atan2(point[1], point[0])
-
-
+ 
 def pointwise_equal(a,b, epsilon):
 
     if a.__class__ != b.__class__:
@@ -306,7 +305,12 @@ class Arc (Segment):
         if self.clockwise:
             d *= -1
         # Compute half of the angle of the arc
-        alpha = np.arccos((d.real * a.real + d.imag * a.imag) / (r * abs(d)))
+        
+        alpha = (d.real * a.real + d.imag * a.imag) / (r * abs(d))
+        if alpha > 1.0:
+            alpha = 1.0
+        
+        alpha = np.arccos(alpha) #(d.real * a.real + d.imag * a.imag) / (r * abs(d)))
         if alpha < 1e-18:
             return 2 * math.pi * r, self.center
         # Use the cute little integration result to find the centroid
@@ -326,11 +330,14 @@ class Arc (Segment):
                             angle(delta), angle(self.end - self.center),
                             is_counter_clockwise = not self.clockwise)
     def linearize_to(self, tolerance):
-
         # Complexify everything
         a,b  = self.start - self.center, self.end - self.center
         r = math.sqrt(a.dot(a))
-        cos = math.acos(a.dot(b) / math.sqrt(a.dot(a) * b.dot(b)))
+
+
+        
+        cos = np.arccos(a.dot(b) / math.sqrt(a.dot(a) * b.dot(b)))
+            
         det = a[0] * b[1] - a[1] * b[0]
 
         if det < 0:
@@ -347,3 +354,7 @@ class Arc (Segment):
             
         for p in span:
             yield self.center + np.array([r * math.cos(start + p),r * math.sin(start + p)])
+
+    def to_polyline(self, tolerance):
+
+        return Polyline(np.array(list(self.linearize_to(tolerance))))
